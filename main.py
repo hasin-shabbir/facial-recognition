@@ -45,7 +45,7 @@ detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(face_recognition_models.pose_predictor_model_location())
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
-INITIAL_FRAMES = 10
+INITIAL_FRAMES = 4
 
 def get_db():
     db = SessionLocal()
