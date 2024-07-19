@@ -3,38 +3,54 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Facial Recognition Login</title>
+    <title>Two Buttons Page</title>
     <style>
         body {
             font-family: Arial, sans-serif;
             display: flex;
-            flex-direction: column;
-            align-items: center;
             justify-content: center;
+            align-items: center;
             height: 100vh;
             margin: 0;
+            background-color: #f0f0f0;
         }
-        video {
-            width: 640px;
-            height: auto;
-            border: 2px solid black;
-            -webkit-transform: scaleX(-1);
-            transform: scaleX(-1);
+        .button-container {
+            text-align: center;
         }
-        canvas {
-            display: none;
+        .button {
+            background-color: #007bff;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #0056b3;
         }
     </style>
 </head>
 <body>
-    <h1 id="pageTitle"></h1>
-    <p id="instructions">Waiting for challenge...</p>
-    <video id="videoElement" autoplay></video>
-    <canvas id="canvasElement"></canvas>
-    <script src="frontend_script.js"></script>
+    <div class="button-container">
+        <button class="button" onclick="handleClick('Login')">Login</button>
+        <button class="button" onclick="handleClick('Register')">Register</button>
+    </div>
+
     <script>
-        const mode = new URLSearchParams(window.location.search).get('mode');
-        initializePage(mode);
+        function handleClick(buttonName) {
+            if (buttonName == 'Login'){
+                window.location.href = 'main.html?mode=login';
+            }
+            else if (buttonName == 'Register'){
+                window.location.href = 'main.html?mode=register';
+            }
+        }
     </script>
 </body>
 </html>

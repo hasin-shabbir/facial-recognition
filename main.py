@@ -159,18 +159,15 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
     # challenges = ["blink", "smile", "nod", "wink"]
     # challenges = ["blink", "nod", "wink"]
     challenges = ["blink", "wink"]
-
-
-
     selected_challenges = random.sample(challenges, 2)
     challenge_index = 0
 
-    await websocket.send_json({"challenges": selected_challenges, "current_challenge": selected_challenges[challenge_index]})
+    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
 
     async for message in websocket.iter_text():
-        # await websocket.send_json({"msg": message})
-        # data = json.loads(message)
-        base64_str = message.split(",")[1]
+        message = json.loads(message)
+        image_message = message['image']
+        base64_str = image_message.split(",")[1]
         image_data = base64.b64decode(base64_str)
         np_arr = np.frombuffer(image_data, np.uint8)
         image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -200,11 +197,11 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
             
             if challenge_index >= len(selected_challenges):
                 face_encoding = get_face_encoding(image)
-                user = User(username="mushabbir@noon.com", face_encoding=face_encoding.tobytes())
+                user = User(username=message['username'], face_encoding=face_encoding.tobytes())
                 db.add(user)
                 db.commit()
                 db.refresh(user)
-                await websocket.send_json({"msg": "User registered successfully"})
+                await websocket.send_json({"success": True, "msg": f"{message['username']} registered successfully"})
                 await websocket.close()
                 return
 
@@ -212,7 +209,7 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
                 await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
             image_sequence.pop(0)
     
-    await websocket.send_json({"msg": "registration failed"})
+    await websocket.send_json({"success": False, "msg": "registration failed"})
     await websocket.close()
 
 
@@ -230,10 +227,12 @@ async def login(websocket: WebSocket, db: Session = Depends(get_db)):
     selected_challenges = random.sample(challenges, 2)
     challenge_index = 0
 
-    await websocket.send_json({"challenges": selected_challenges, "current_challenge": selected_challenges[challenge_index]})
+    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
     
     async for message in websocket.iter_text():
-        base64_str = message.split(",")[1]
+        message = json.loads(message)
+        image_message = message['image']
+        base64_str = image_message.split(",")[1]
         image_data = base64.b64decode(base64_str)
         np_arr = np.frombuffer(image_data, np.uint8)
         image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
@@ -256,17 +255,25 @@ async def login(websocket: WebSocket, db: Session = Depends(get_db)):
             
             if challenge_index >= len(selected_challenges):
                 face_encoding = get_face_encoding(image)
-                users = db.query(User).filter_by(username = 'mushabbir@noon.com').all()
-                for user in users:
-                    db_face_encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
-                    matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
-                    if True in matches:
-                        await websocket.send_json({"msg": "Login successful", "username": user.username})
-                        await websocket.close()
-                        return
+                user = db.query(User).filter_by(username = message['username']).one_or_none()
+                if user is None:
+                    break
+                # for user in users:
+                db_face_encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
+                matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
+                if True in matches:
+                    await websocket.send_json({"success": True, "msg": f"Login successful for {user.username}"})
+                    await websocket.close()
+                    return
             if challenge_index < len(selected_challenges):
                 await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
             image_sequence.pop(0)
     
-    await websocket.send_json({"msg": "Login failed"})
+    await websocket.send_json({"success": False, "msg": "Login failed"})
     await websocket.close()
+
+# TODO: full face detection and not partial
+# TODO: fix challenges
+# TODO: deepfake/fake detection
+# TODO: wink and blink differentiation
+# TODO: left wink and right wink separation

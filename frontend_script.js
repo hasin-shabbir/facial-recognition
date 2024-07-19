@@ -1,13 +1,15 @@
-function initializePage(mode){
+function initializePageText(mode){
     const pageTitle = document.getElementById("pageTitle");
     if (mode === 'register') {
         pageTitle.textContent = "Register";
     } else {
         pageTitle.textContent = "Login";
     }
+}
+function initializePage(mode, username){
 
     const socketUrl = mode === 'register' ? 'ws://localhost:8003/register' : 'ws://localhost:8003/login';
-    const socket = new WebSocket("ws://localhost:8003/login");
+    const socket = new WebSocket(socketUrl);
     const constraints = { video: true };
     
     let mediaRecorder;
@@ -27,9 +29,20 @@ function initializePage(mode){
     socket.onmessage = function (event) {
         const data = JSON.parse(event.data);
         currentChallenge = data.current_challenge;
-        const instructions = document.getElementById("instructions");
+        const challenge = document.getElementById("challenge");
+        const result = document.getElementById("result");
         
-        instructions.textContent = `Please ${currentChallenge.replace("_", " ")}`;
+        const loginSuccess = data.success;
+        if (loginSuccess === true) {
+            result.textContent = data.msg;
+            return;
+        }
+        else if (loginSuccess === false) {
+            result.textContent = data.msg;
+            return;
+        }
+        
+        challenge.textContent = `Please ${currentChallenge?.replace("_", " ")}`;
     };
     
     // Capture and send video frames
@@ -46,7 +59,11 @@ function initializePage(mode){
             canvas.height = video.videoHeight;
             context.drawImage(video, 0, 0, canvas.width, canvas.height);
             const imageData = canvas.toDataURL("image/jpeg");
-            socket.send(imageData);
+            data = {
+                username: username,
+                image: imageData,
+            };
+            socket.send(JSON.stringify(data));
         }, 500); // Send frames every 500ms
     }
     
@@ -72,9 +89,12 @@ function initializePage(mode){
         if (videoStream) {
             stopMediaTracks(videoStream);
         }
-        if (captureInterval) {
-            clearInterval(captureInterval);
-        }
+        document.getElementById("pageTitle").style.display = "none";
+        document.getElementById("videoElement").style.display = "none";
+        document.getElementById("canvasElement").style.display = "none";
+        document.getElementById("challenge").style.display = "none";
+        document.getElementById("result").style.display = "block";
+        document.getElementById("home-btn").style.display = "block";
     }
     
     window.onbeforeunload = function () {

@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Facial Recognition Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+        }
+        video {
+            width: 640px;
+            height: auto;
+            border: 2px solid black;
+            -webkit-transform: scaleX(-1);
+            transform: scaleX(-1);
+        }
+        canvas {
+            display: none;
+        }
+        #startButton, .button {
+            background-color: #007bff;
+            border: none;
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 10px;
+            cursor: pointer;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .button:hover {
+            background-color: #0056b3;
+        }
+        input {
+            padding: 10px;
+            margin: 10px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        #challenge {
+            margin: 10px;
+            font-size: 30px;
+        }
+        #home-btn{
+            display: none;
+        }
+        #result {
+            display: none;
+            margin: 10px;
+            font-size: 40px;
+        }
+    </style>
+</head>
+<body>
+    <h1 id="pageTitle"></h1>
+    <p id="challenge"></p>
+    <p id="result"></p>
+    <button id="home-btn" class="button" onclick="handleClick('home')">Home</button>
+    <div id="loginSection">
+        <input type="text" id="usernameInput" placeholder="Enter username" />
+        <button id="startButton">Next</button>
+    </div>
+    <div id="videoSection" style="display: none;">
+        <video id="videoElement" autoplay></video>
+        <canvas id="canvasElement"></canvas>
+    </div>
+    <script src="frontend_script.js"></script>
+    <script>
+        const mode = new URLSearchParams(window.location.search).get('mode');
+        initializePageText(mode);
+        document.getElementById('startButton').addEventListener('click', () => {
+            const username = document.getElementById('usernameInput').value.trim();
+            if (username) {
+                // Hide login section and show video section
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('videoSection').style.display = 'block';
+                
+                // Initialize WebSocket and video components
+                initializePage(mode, username);
+            } else {
+                alert('Please enter a username.');
+            }
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Enter') {
+                document.getElementById('startButton').click();
+            }
+        });
+        function handleClick(buttonName) {
+            if (buttonName == 'home'){
+                window.location.href = 'index.html';
+            }
+        }
+    </script>
+</body>
+</html>
