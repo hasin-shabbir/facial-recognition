@@ -280,11 +280,7 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
 async def login(websocket: WebSocket, db: Session = Depends(get_db)):
     await process(websocket, db, "login")
 
-# TODO: full face detection and not partial
-# TODO: fix challenges
 # TODO: deepfake/fake detection
-# TODO: wink and blink differentiation
-# TODO: left wink and right wink separation
 # TODO: someone may use a script to send images based on the challenge so we need to detect that/detect liveness
 # TODO: can we detect depth of the face/image to detect if it's a real face or a photo?
 # TODO: break after 10 seconds if no response or after 60 images
