@@ -7,10 +7,11 @@ ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies for building mysqlclient
 RUN apt-get update \
-    && apt-get install -y \
-       build-essential \
-       pkg-config \
-       default-libmysqlclient-dev \
+    &&  apt-get install -y \
+        build-essential \
+        pkg-config \
+        default-libmysqlclient-dev \
+        cmake \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
