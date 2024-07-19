@@ -52,6 +52,10 @@ def get_db():
         db.close()
 
 def detect_blinks(image):
+    '''
+        TODO: could be improved by tracking the image sequence and checking 
+            if the eyes are closed for a certain number of frames and open before and after
+    '''
     try:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         rects = detector(gray, 0)
@@ -196,6 +200,41 @@ def is_full_face_detected(face_landmarks_list):
                 return False
     return True
 
+def calculate_landmark_shifts(image_sequence):
+    image_sequence = image_sequence[-10:]
+    landmarks_list = []
+    for image in image_sequence:
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        face_landmarks_list = face_recognition.face_landmarks(rgb_image)
+        if face_landmarks_list:
+            # Assuming we're dealing with the first detected face for simplicity
+            face_landmarks = face_landmarks_list[0]
+            # Convert the landmarks to a numpy array
+            coords = []
+            for key in face_landmarks:
+                coords.extend(face_landmarks[key])
+            landmarks_list.append(np.array(coords))
+
+    shifts_list = []
+    # Calculate the Euclidean distance between corresponding landmarks in two frames
+    for i in range(1, len(landmarks_list)):
+        landmarks1 = landmarks_list[i-1]
+        landmarks2 = landmarks_list[i]
+        shifts = np.linalg.norm(landmarks1 - landmarks2, axis=1)
+        shifts_list.append(shifts)
+    return shifts_list
+
+def average_shifts(shifts_list):
+    # Compute the average shifts across all frames
+    if len(shifts_list) == 0:
+        return 0
+    return np.mean([np.mean(shifts) for shifts in shifts_list if len(shifts) > 0])
+
+def detect_micromovents(image_sequence):
+    avg_shifts = average_shifts(calculate_landmark_shifts(image_sequence))
+    mean_shift = np.mean(avg_shifts)
+    return mean_shift > 0.5
+
 async def process(websocket: WebSocket, db: Session, type: str):
     await websocket.accept()
     
@@ -226,6 +265,10 @@ async def process(websocket: WebSocket, db: Session, type: str):
             return
 
         if len(image_sequence) > 10:
+            if not detect_micromovents(image_sequence):
+                await websocket.send_json({"success": False, "msg": "Face not moving enough"})
+                await websocket.close()
+                return
             if selected_challenges[challenge_index] == "blink" and detect_blinks(image_sequence[-1]):
                 await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
                 challenge_index += 1
@@ -244,7 +287,6 @@ async def process(websocket: WebSocket, db: Session, type: str):
             elif selected_challenges[challenge_index] == "turn_right" and detect_turn(image_sequence, "right"):
                 await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
                 challenge_index += 1
-            
             if challenge_index >= len(selected_challenges):
                 face_encoding = get_face_encoding(image)
                 if type == "login":
@@ -255,6 +297,10 @@ async def process(websocket: WebSocket, db: Session, type: str):
                     matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
                     if True in matches:
                         await websocket.send_json({"success": True, "msg": f"Login successful for {user.username}"})
+                        await websocket.close()
+                        return
+                    else:
+                        await websocket.send_json({"success": False, "msg": "Login failed"})
                         await websocket.close()
                         return
                 if type == "register":
@@ -280,7 +326,7 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
 async def login(websocket: WebSocket, db: Session = Depends(get_db)):
     await process(websocket, db, "login")
 
-# TODO: deepfake/fake detection
 # TODO: someone may use a script to send images based on the challenge so we need to detect that/detect liveness
 # TODO: can we detect depth of the face/image to detect if it's a real face or a photo?
 # TODO: break after 10 seconds if no response or after 60 images
+# TODO: deepfake/fake detection
