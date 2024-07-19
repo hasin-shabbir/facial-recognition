@@ -10,7 +10,7 @@ RUN apt-get update \
     && apt-get install -y \
        build-essential \
        pkg-config \
-       libmysqlclient-dev \
+       default-libmysqlclient-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Set the working directory
