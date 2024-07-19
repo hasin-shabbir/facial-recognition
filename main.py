@@ -8,6 +8,7 @@ import cv2
 import face_recognition
 import face_recognition_models
 import dlib
+import time
 
 from sqlalchemy import Column, Integer, String, LargeBinary, create_engine
 from sqlalchemy.ext.declarative import declarative_base
@@ -43,6 +44,8 @@ def health_check():
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(face_recognition_models.pose_predictor_model_location())
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
+
+INITIAL_FRAMES = 10
 
 def get_db():
     db = SessionLocal()
@@ -126,7 +129,7 @@ def detect_nod(image_sequence):
                 and if the nod was significant enough at the end
     '''
     try:
-        chunk = 10
+        chunk = INITIAL_FRAMES if len(image_sequence) >= INITIAL_FRAMES else len(image_sequence)
         nod_threshold = 10
         previous_y = None
 
@@ -201,7 +204,8 @@ def is_full_face_detected(face_landmarks_list):
     return True
 
 def calculate_landmark_shifts(image_sequence):
-    image_sequence = image_sequence[-10:]
+    sequence_length = INITIAL_FRAMES if len(image_sequence) >= INITIAL_FRAMES else len(image_sequence)
+    image_sequence = image_sequence[-INITIAL_FRAMES:]
     landmarks_list = []
     for image in image_sequence:
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
@@ -235,88 +239,95 @@ def detect_micromovents(image_sequence):
     mean_shift = np.mean(avg_shifts)
     return mean_shift > 0.5
 
-async def process(websocket: WebSocket, db: Session, type: str):
+async def process(websocket: WebSocket, db: Session, process_type: str):
     await websocket.accept()
-    
-    image_sequence = []
-    challenges = ["blink", "wink", "smile", "nod", "turn_left", "turn_right"]
-    selected_challenges = random.sample(challenges, 2)
-    challenge_index = 0
+    start_time = time.time()
+    try:
+        image_sequence = []
+        challenges = ["blink", "wink", "smile", "nod", "turn_left", "turn_right"]
+        selected_challenges = random.sample(challenges, 2)
+        challenge_index = 0
 
-    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
+        await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
 
-    async for message in websocket.iter_text():
-        message = json.loads(message)
-        image_message = message['image']
-        base64_str = image_message.split(",")[1]
-        image_data = base64.b64decode(base64_str)
-        np_arr = np.frombuffer(image_data, np.uint8)
-        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        image_sequence.append(image)
-        if challenge_index >= len(selected_challenges):
-            break
-
-        rgb_image = cv2.cvtColor(image_sequence[-1], cv2.COLOR_BGR2RGB)
-        face_landmarks_list = face_recognition.face_landmarks(rgb_image)
-
-        if not face_landmarks_list or not is_full_face_detected(face_landmarks_list):
-            await websocket.send_json({"success": False, "msg": "Full face not detected"})
-            await websocket.close()
-            return
-
-        if len(image_sequence) > 10:
-            if not detect_micromovents(image_sequence):
-                await websocket.send_json({"success": False, "msg": "Face not moving enough"})
+        async for message in websocket.iter_text():
+            if time.time() - start_time > 30:
+                await websocket.send_json({"success": False, "msg": "Time limit exceeded, try again"})
                 await websocket.close()
                 return
-            if selected_challenges[challenge_index] == "blink" and detect_blinks(image_sequence[-1]):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "smile" and detect_smile(image_sequence[-1]):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "nod" and detect_nod(image_sequence):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "wink" and detect_wink(image_sequence[-1]):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "turn_left" and detect_turn(image_sequence, "left"):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "turn_right" and detect_turn(image_sequence, "right"):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
+            message = json.loads(message)
+            image_message = message['image']
+            base64_str = image_message.split(",")[1]
+            image_data = base64.b64decode(base64_str)
+            np_arr = np.frombuffer(image_data, np.uint8)
+            image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+            image_sequence.append(image)
             if challenge_index >= len(selected_challenges):
-                face_encoding = get_face_encoding(image)
-                if type == "login":
-                    user = db.query(User).filter_by(username = message['username']).one_or_none()
-                    if user is None:
-                        break
-                    db_face_encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
-                    matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
-                    if True in matches:
-                        await websocket.send_json({"success": True, "msg": f"Login successful for {user.username}"})
-                        await websocket.close()
-                        return
-                    else:
-                        await websocket.send_json({"success": False, "msg": "Login failed"})
-                        await websocket.close()
-                        return
-                if type == "register":
-                    user = User(username=message['username'], face_encoding=face_encoding.tobytes())
-                    db.add(user)
-                    db.commit()
-                    db.refresh(user)
-                    await websocket.send_json({"success": True, "msg": f"{message['username']} registered successfully"})
+                break
+
+            rgb_image = cv2.cvtColor(image_sequence[-1], cv2.COLOR_BGR2RGB)
+            face_landmarks_list = face_recognition.face_landmarks(rgb_image)
+
+            if not face_landmarks_list or not is_full_face_detected(face_landmarks_list):
+                await websocket.send_json({"success": False, "msg": "Full face not detected"})
+                await websocket.close()
+                return
+
+            if len(image_sequence) > INITIAL_FRAMES:
+                if not detect_micromovents(image_sequence):
+                    await websocket.send_json({"success": False, "msg": "Face not moving enough"})
                     await websocket.close()
                     return
+                if selected_challenges[challenge_index] == "blink" and detect_blinks(image_sequence[-1]):
+                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                    challenge_index += 1
+                elif selected_challenges[challenge_index] == "smile" and detect_smile(image_sequence[-1]):
+                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                    challenge_index += 1
+                elif selected_challenges[challenge_index] == "nod" and detect_nod(image_sequence):
+                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                    challenge_index += 1
+                elif selected_challenges[challenge_index] == "wink" and detect_wink(image_sequence[-1]):
+                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                    challenge_index += 1
+                elif selected_challenges[challenge_index] == "turn_left" and detect_turn(image_sequence, "left"):
+                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                    challenge_index += 1
+                elif selected_challenges[challenge_index] == "turn_right" and detect_turn(image_sequence, "right"):
+                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                    challenge_index += 1
+                if challenge_index >= len(selected_challenges):
+                    face_encoding = get_face_encoding(image)
+                    if process_type == "login":
+                        user = db.query(User).filter_by(username = message['username']).one_or_none()
+                        if user is None:
+                            break
+                        db_face_encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
+                        matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
+                        if True in matches:
+                            await websocket.send_json({"success": True, "msg": f"Login successful for {user.username}"})
+                            await websocket.close()
+                            return
+                        else:
+                            await websocket.send_json({"success": False, "msg": "Login failed"})
+                            await websocket.close()
+                            return
+                    if process_type == "register":
+                        user = User(username=message['username'], face_encoding=face_encoding.tobytes())
+                        db.add(user)
+                        db.commit()
+                        db.refresh(user)
+                        await websocket.send_json({"success": True, "msg": f"{message['username']} registered successfully"})
+                        await websocket.close()
+                        return
 
-            if challenge_index < len(selected_challenges):
-                await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
-    
-    await websocket.send_json({"success": False, "msg": f"{"registration" if type == "register" else "login"} failed"})
-    await websocket.close()
+                if challenge_index < len(selected_challenges):
+                    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
+        await websocket.send_json({"success": False, "msg": f"{"registration" if type == "register" else "login"} failed"})
+        await websocket.close()
+    except Exception as e:
+        await websocket.send_json({"success": False, "msg": f"{"registration" if type == "register" else "login"} failed"})
+        await websocket.close()
 
 @app.websocket("/register")
 async def register(websocket: WebSocket, db: Session = Depends(get_db)):
