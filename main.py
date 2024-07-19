@@ -339,5 +339,4 @@ async def login(websocket: WebSocket, db: Session = Depends(get_db)):
 
 # TODO: someone may use a script to send images based on the challenge so we need to detect that/detect liveness
 # TODO: can we detect depth of the face/image to detect if it's a real face or a photo?
-# TODO: break after 10 seconds if no response or after 60 images
 # TODO: deepfake/fake detection
