@@ -1,6 +1,10 @@
 from fastapi import FastAPI, WebSocket, Depends, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.requests import Request
+from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 import json
+from typing import Optional
 import base64
 import random
 import numpy as np
@@ -31,15 +35,6 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
-
-@app.get('/')
-def f():
-    return {"status": "ok"}
-
-@app.get('/hc')
-def health_check():
-    return {"status": "ok"}
-
 
 detector = dlib.get_frontal_face_detector()
 predictor = dlib.shape_predictor(face_recognition_models.pose_predictor_model_location())
@@ -328,6 +323,26 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
     except Exception as e:
         await websocket.send_json({"success": False, "msg": f"{"registration" if type == "register" else "login"} failed"})
         await websocket.close()
+
+# Serve static files from the 'static' directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+@app.get('/hc')
+def health_check():
+    return {"status": "ok"}
+
+@app.get("/")
+async def root():
+    return FileResponse("static/index.html")
+
+@app.get("/{filename:path}")
+async def serve_static_file(request: Request, filename: str, mode: Optional[str] = None):
+    if filename in ("main.html","index.html"):
+        # Serve main.html with mode query parameter
+        # Here, you could include logic to serve different content based on the mode
+        return FileResponse(f"static/{filename}")
+    else:
+        return {"error": "File not found"}
 
 @app.websocket("/register")
 async def register(websocket: WebSocket, db: Session = Depends(get_db)):
