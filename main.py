@@ -13,13 +13,13 @@ import face_recognition
 import face_recognition_models
 import dlib
 import time
+import os
 
 from sqlalchemy import Column, Integer, String, LargeBinary, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-
-DATABASE_URL = "mysql+mysqldb://root:@localhost:3306/facial_recognition"
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 Base = declarative_base()
 
@@ -337,7 +337,7 @@ async def root():
 
 @app.get("/{filename:path}")
 async def serve_static_file(request: Request, filename: str, mode: Optional[str] = None):
-    if filename in ("main.html","index.html"):
+    if filename in ("main.html","index.html","frontend_script.js"):
         # Serve main.html with mode query parameter
         # Here, you could include logic to serve different content based on the mode
         return FileResponse(f"static/{filename}")

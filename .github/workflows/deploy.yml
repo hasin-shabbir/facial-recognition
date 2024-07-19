@@ -1,0 +1,44 @@
+name: Deploy to Google Cloud Run
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v1
+        with:
+          version: 'latest'
+
+      - name: Authenticate to Google Cloud
+        run: echo "${{ secrets.GCP_SA_KEY }}" | gcloud auth activate-service-account --key-file=-
+
+      - name: Configure gcloud
+        run: |
+          gcloud config set project tensile-cogency-404310
+          gcloud config set run/region europe-north1
+
+      - name: Build Docker image
+        run: |
+          docker build -t gcr.io/tensile-cogency-404310/facial-detection .
+
+      - name: Push Docker image
+        run: |
+          docker push gcr.io/tensile-cogency-404310/facial-detection
+
+      - name: Deploy to Google Cloud Run
+        run: |
+          gcloud run deploy your-service-name \
+            --image gcr.io/tensile-cogency-404310/facial-detection \
+            --platform managed \
+            --region europe-north1 \
+            --allow-unauthenticated \
+            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
