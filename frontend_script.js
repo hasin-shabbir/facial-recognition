@@ -1,9 +1,17 @@
 function initializePageText(mode){
     const pageTitle = document.getElementById("pageTitle");
+    const startButton = document.getElementById("startButton");
+    const otherButton = document.getElementById('otherButton');
     if (mode === 'register') {
         pageTitle.textContent = "Register";
+        startButton.innerText = "Register";
+        otherButton.innerHTML = 'Login instead';
+        otherButton.onclick = () => handleClick('Login');
     } else {
         pageTitle.textContent = "Login";
+        startButton.innerText = "Login";
+        otherButton.innerHTML = 'Don\'t have an account? Register here';
+        otherButton.onclick = () => handleClick('Register');
     }
 }
 function initializePage(mode, username){
@@ -11,6 +19,8 @@ function initializePage(mode, username){
     const socketUrl = mode === 'register' ? 'ws://localhost:8003/register' : 'ws://localhost:8003/login';
     const socket = new WebSocket(socketUrl);
     const constraints = { video: true };
+
+    document.getElementById("challenge").innerText = "Detecting face...";
     
     let mediaRecorder;
     let currentChallenge;

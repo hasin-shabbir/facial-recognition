@@ -248,8 +248,6 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
         selected_challenges = random.sample(challenges, 2)
         challenge_index = 0
 
-        await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
-
         async for message in websocket.iter_text():
             if time.time() - start_time > 30:
                 await websocket.send_json({"success": False, "msg": "Time limit exceeded, try again"})
@@ -337,6 +335,7 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
 async def login(websocket: WebSocket, db: Session = Depends(get_db)):
     await process(websocket, db, "login")
 
+# TODO: improve/revisit logic for challenges and improve arithmetics
 # TODO: someone may use a script to send images based on the challenge so we need to detect that/detect liveness
 # TODO: can we detect depth of the face/image to detect if it's a real face or a photo?
 # TODO: deepfake/fake detection
