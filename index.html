@@ -15,7 +15,11 @@
             margin: 0;
         }
         video {
-            display: none;
+            width: 640px;
+            height: auto;
+            border: 2px solid black;
+            -webkit-transform: scaleX(-1);
+            transform: scaleX(-1);
         }
         canvas {
             display: none;
@@ -23,10 +27,14 @@
     </style>
 </head>
 <body>
-    <h1>Login</h1>
+    <h1 id="pageTitle"></h1>
     <p id="instructions">Waiting for challenge...</p>
     <video id="videoElement" autoplay></video>
     <canvas id="canvasElement"></canvas>
     <script src="frontend_script.js"></script>
+    <script>
+        const mode = new URLSearchParams(window.location.search).get('mode');
+        initializePage(mode);
+    </script>
 </body>
 </html>

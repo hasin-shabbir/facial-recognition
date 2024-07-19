@@ -200,7 +200,7 @@ async def register(websocket: WebSocket, db: Session = Depends(get_db)):
             
             if challenge_index >= len(selected_challenges):
                 face_encoding = get_face_encoding(image)
-                user = User(username="hasinshabbir13@noon.com", face_encoding=face_encoding.tobytes())
+                user = User(username="mushabbir@noon.com", face_encoding=face_encoding.tobytes())
                 db.add(user)
                 db.commit()
                 db.refresh(user)
