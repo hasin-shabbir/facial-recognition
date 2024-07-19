@@ -90,6 +90,7 @@ def get_face_encoding(image):
         raise Exception("No face detected")
     return face_recognition.face_encodings(image, known_face_locations=face_locations)[0]
 
+# FIXME: this is not working as expected
 def optical_flow_liveness_detection(prev_frame, curr_frame, threshold=5.0):
     prev_gray = cv2.cvtColor(prev_frame, cv2.COLOR_BGR2GRAY)
     curr_gray = cv2.cvtColor(curr_frame, cv2.COLOR_BGR2GRAY)
@@ -100,6 +101,7 @@ def optical_flow_liveness_detection(prev_frame, curr_frame, threshold=5.0):
     
     return mean_magnitude > threshold
 
+# FIXME: this is not working as expected
 def is_live_feed(image_sequence):
     if len(image_sequence) < 2:
         return False
