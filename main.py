@@ -6,11 +6,13 @@ import random
 import numpy as np
 import cv2
 import face_recognition
+import face_recognition_models
 import dlib
 
 from sqlalchemy import Column, Integer, String, LargeBinary, create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
 
 DATABASE_URL = "mysql+mysqldb://root:@localhost:3306/facial_recognition"
 
@@ -39,7 +41,8 @@ def health_check():
 
 
 detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor("shape_predictor_68_face_landmarks.dat")
+predictor = dlib.shape_predictor(face_recognition_models.pose_predictor_model_location())
+smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
 def get_db():
     db = SessionLocal()
@@ -49,20 +52,23 @@ def get_db():
         db.close()
 
 def detect_blinks(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    rects = detector(gray, 0)
-    for rect in rects:
-        shape = predictor(gray, rect)
-        shape = face_recognition.face_landmarks(image)
-        left_eye = shape[0]["left_eye"]
-        right_eye = shape[0]["right_eye"]
-        
-        left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
-        right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
-        
-        if left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio < 0.2:
-            return True
-    return False
+    try:
+        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        rects = detector(gray, 0)
+        for rect in rects:
+            shape = predictor(gray, rect)
+            shape = face_recognition.face_landmarks(image)
+            left_eye = shape[0]["left_eye"]
+            right_eye = shape[0]["right_eye"]
+            
+            left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
+            right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
+            
+            if left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio < 0.2:
+                return True    
+        return False
+    except Exception as e:
+        return False
 
 def calculate_eye_aspect_ratio(eye):
     A = np.linalg.norm(np.array(eye[1]) - np.array(eye[5]))
@@ -72,7 +78,7 @@ def calculate_eye_aspect_ratio(eye):
     return ear
 
 def get_face_encoding(image):
-    face_locations = face_recognition.face_locations(image)
+    face_locations = face_recognition.face_locations(image, model="cnn") # TODO: use model="cnn" for better accuracy?
     if len(face_locations) == 0:
         raise Exception("No face detected")
     return face_recognition.face_encodings(image, known_face_locations=face_locations)[0]
@@ -96,184 +102,189 @@ def is_live_feed(image_sequence):
     return True
 
 def detect_smile(image):
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    rects = detector(gray, 0)
-    for rect in rects:
-        shape = predictor(gray, rect)
-        shape = face_recognition.face_landmarks(image)
-        top_lip = shape[0]["top_lip"]
-        bottom_lip = shape[0]["bottom_lip"]
-        mouth = top_lip + bottom_lip[::-1]
-        
-        mouth_aspect_ratio = calculate_mouth_aspect_ratio(mouth)
-        if mouth_aspect_ratio > 0.5:
-            return True
-    return False
-
-def calculate_mouth_aspect_ratio(mouth):
-    A = np.linalg.norm(np.array(mouth[3]) - np.array(mouth[9]))
-    B = np.linalg.norm(np.array(mouth[2]) - np.array(mouth[10]))
-    C = np.linalg.norm(np.array(mouth[4]) - np.array(mouth[8]))
-    D = np.linalg.norm(np.array(mouth[0]) - np.array(mouth[6]))
-    mar = (A + B + C) / (3.0 * D)
-    return mar
+    try:
+        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        face_locations = face_recognition.face_locations(rgb_image)
+        gray_image = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        for (top, right, bottom, left) in face_locations:
+            face_gray = gray_image[top:bottom, left:right]
+            smiles = smile_cascade.detectMultiScale(face_gray, scaleFactor=1.1, minNeighbors=120, minSize=(40, 40))
+            if len(smiles) > 0:
+                return True
+        return False
+    except Exception as e:
+        return False
 
 def detect_nod(image_sequence):
-    # Use optical flow or other methods to detect nodding motion
-    return is_live_feed(image_sequence)
+    '''
+    # TODO: should probably keep track of original y position, 
+                and all subsequent y positions and detect if nod direction stayed the same throughout
+                and if the nod was significant enough at the end
+    '''
+    try:
+        chunk = 10
+        nod_threshold = 10
+        previous_y = None
+
+        for frame in image_sequence[-chunk:]:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            face_landmarks_list = face_recognition.face_landmarks(rgb_frame)
+            
+            for face_landmarks in face_landmarks_list:
+                nose_tip = face_landmarks['nose_tip'][2]  # [2] is typically the bottom-most point of the nose tip
+                current_y = nose_tip[1]
+                if previous_y is not None:
+                    movement = current_y - previous_y
+                    if movement > nod_threshold:
+                        return True
+                    
+                previous_y = current_y
+        
+        return False
+    except Exception as e:
+        return False
+
+def detect_turn(image_sequence, direction: str):
+    if direction.lower() not in ["left", "right"]:
+        return False
+    try:
+        turn_threshold = 10
+        previous_x = None
+
+        for frame in image_sequence:
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            face_landmarks_list = face_recognition.face_landmarks(rgb_frame)
+            for face_landmarks in face_landmarks_list:                
+                nose_tip = face_landmarks['nose_tip'][2] # [2] is typically the bottom-most point of the nose tip
+                current_x = nose_tip[0]
+                
+                if previous_x is not None:
+                    if direction == "left":
+                        movement = previous_x - current_x  # Positive movement indicates turning left
+                    elif direction == "right":
+                        movement = current_x - previous_x
+                    if movement > turn_threshold:
+                        return True
+                previous_x = current_x
+        return False
+    except Exception as e:
+        return False
 
 def detect_wink(image):
     try:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
         rects = detector(gray, 0)
-    except Exception as e:
-        print(image)
-        raise e
-    for rect in rects:
-        shape = predictor(gray, rect)
-        shape = face_recognition.face_landmarks(image)
-        left_eye = shape[0]["left_eye"]
-        right_eye = shape[0]["right_eye"]
-        
-        left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
-        right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
-        
-        if (left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio > 0.2) or (left_eye_aspect_ratio > 0.2 and right_eye_aspect_ratio < 0.2):
-            return True
-    return False
+        for rect in rects:
+            shape = predictor(gray, rect)
+            shape = face_recognition.face_landmarks(image)
+            left_eye = shape[0]["left_eye"]
+            right_eye = shape[0]["right_eye"]
+            
+            left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
+            right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
 
-def detect_color(image, color):
-    # Simple color detection logic
-    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
-    lower_color = np.array(color['lower'])
-    upper_color = np.array(color['upper'])
-    mask = cv2.inRange(hsv, lower_color, upper_color)
-    return cv2.countNonZero(mask) > 0
+            return (left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio > 0.2) or (left_eye_aspect_ratio > 0.2 and right_eye_aspect_ratio < 0.2)
+        return False
+    except Exception as e:
+        return False
+    
+def is_full_face_detected(face_landmarks_list):
+    required_landmarks = ["chin", "left_eye", "right_eye", "nose_tip", "top_lip", "bottom_lip", "left_eyebrow", "right_eyebrow", "nose_bridge"]
+    for face_landmarks in face_landmarks_list:
+        for landmark in required_landmarks:
+            if landmark not in face_landmarks:
+                return False
+    return True
+
+async def process(websocket: WebSocket, db: Session, type: str):
+    await websocket.accept()
+    
+    image_sequence = []
+    challenges = ["blink", "wink", "smile", "nod", "turn_left", "turn_right"]
+    selected_challenges = random.sample(challenges, 2)
+    challenge_index = 0
+
+    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
+
+    async for message in websocket.iter_text():
+        message = json.loads(message)
+        image_message = message['image']
+        base64_str = image_message.split(",")[1]
+        image_data = base64.b64decode(base64_str)
+        np_arr = np.frombuffer(image_data, np.uint8)
+        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        image_sequence.append(image)
+        if challenge_index >= len(selected_challenges):
+            break
+
+        rgb_image = cv2.cvtColor(image_sequence[-1], cv2.COLOR_BGR2RGB)
+        face_landmarks_list = face_recognition.face_landmarks(rgb_image)
+
+        if not face_landmarks_list or not is_full_face_detected(face_landmarks_list):
+            await websocket.send_json({"success": False, "msg": "Full face not detected"})
+            await websocket.close()
+            return
+
+        if len(image_sequence) > 10:
+            if selected_challenges[challenge_index] == "blink" and detect_blinks(image_sequence[-1]):
+                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                challenge_index += 1
+            elif selected_challenges[challenge_index] == "smile" and detect_smile(image_sequence[-1]):
+                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                challenge_index += 1
+            elif selected_challenges[challenge_index] == "nod" and detect_nod(image_sequence):
+                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                challenge_index += 1
+            elif selected_challenges[challenge_index] == "wink" and detect_wink(image_sequence[-1]):
+                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                challenge_index += 1
+            elif selected_challenges[challenge_index] == "turn_left" and detect_turn(image_sequence, "left"):
+                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                challenge_index += 1
+            elif selected_challenges[challenge_index] == "turn_right" and detect_turn(image_sequence, "right"):
+                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
+                challenge_index += 1
+            
+            if challenge_index >= len(selected_challenges):
+                face_encoding = get_face_encoding(image)
+                if type == "login":
+                    user = db.query(User).filter_by(username = message['username']).one_or_none()
+                    if user is None:
+                        break
+                    db_face_encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
+                    matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
+                    if True in matches:
+                        await websocket.send_json({"success": True, "msg": f"Login successful for {user.username}"})
+                        await websocket.close()
+                        return
+                if type == "register":
+                    user = User(username=message['username'], face_encoding=face_encoding.tobytes())
+                    db.add(user)
+                    db.commit()
+                    db.refresh(user)
+                    await websocket.send_json({"success": True, "msg": f"{message['username']} registered successfully"})
+                    await websocket.close()
+                    return
+
+            if challenge_index < len(selected_challenges):
+                await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
+    
+    await websocket.send_json({"success": False, "msg": f"{"registration" if type == "register" else "login"} failed"})
+    await websocket.close()
 
 @app.websocket("/register")
 async def register(websocket: WebSocket, db: Session = Depends(get_db)):
-    await websocket.accept()
-    
-    image_sequence = []
-    # challenges = ["blink", "turn_left", "turn_right", "smile", "nod", "wink"]
-    # challenges = ["blink", "smile", "nod", "wink"]
-    # challenges = ["blink", "nod", "wink"]
-    challenges = ["blink", "wink"]
-    selected_challenges = random.sample(challenges, 2)
-    challenge_index = 0
-
-    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
-
-    async for message in websocket.iter_text():
-        message = json.loads(message)
-        image_message = message['image']
-        base64_str = image_message.split(",")[1]
-        image_data = base64.b64decode(base64_str)
-        np_arr = np.frombuffer(image_data, np.uint8)
-        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        image_sequence.append(image)
-        if challenge_index >= len(selected_challenges):
-            break
-
-        if len(image_sequence) > 10:
-            if selected_challenges[challenge_index] == "blink" and detect_blinks(image_sequence[-1]):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "smile" and detect_smile(image_sequence[-1]):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "nod" and detect_nod(image_sequence):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "wink" and detect_wink(image_sequence[-1]):
-                await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                challenge_index += 1
-            elif selected_challenges[challenge_index] in ["turn_left", "turn_right"]:
-                await websocket.send_json({"msg": f"trying to detect {selected_challenges[challenge_index]}"})
-                await websocket.send_json({"msg": f"live feed: {is_live_feed(image_sequence)}"})
-                if is_live_feed(image_sequence):
-                    await websocket.send_json({"msg": f"{selected_challenges[challenge_index]} completed"})
-                    challenge_index += 1
-            
-            if challenge_index >= len(selected_challenges):
-                face_encoding = get_face_encoding(image)
-                user = User(username=message['username'], face_encoding=face_encoding.tobytes())
-                db.add(user)
-                db.commit()
-                db.refresh(user)
-                await websocket.send_json({"success": True, "msg": f"{message['username']} registered successfully"})
-                await websocket.close()
-                return
-
-            if challenge_index < len(selected_challenges):
-                await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
-            image_sequence.pop(0)
-    
-    await websocket.send_json({"success": False, "msg": "registration failed"})
-    await websocket.close()
-
-
+    await process(websocket, db, "register")
 
 @app.websocket("/login")
 async def login(websocket: WebSocket, db: Session = Depends(get_db)):
-    await websocket.accept()
-    
-    image_sequence = []
-    # challenges = ["blink", "turn_left", "turn_right", "smile", "nod", "wink"]
-    # challenges = ["blink", "smile", "nod", "wink"]
-    # challenges = ["blink", "nod", "wink"]
-    challenges = ["blink", "wink"]
-    
-    selected_challenges = random.sample(challenges, 2)
-    challenge_index = 0
-
-    await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
-    
-    async for message in websocket.iter_text():
-        message = json.loads(message)
-        image_message = message['image']
-        base64_str = image_message.split(",")[1]
-        image_data = base64.b64decode(base64_str)
-        np_arr = np.frombuffer(image_data, np.uint8)
-        image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-        image_sequence.append(image)
-        if challenge_index >= len(selected_challenges):
-            break
-
-        if len(image_sequence) > 10:
-            if selected_challenges[challenge_index] == "blink" and detect_blinks(image_sequence[-1]):
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "smile" and detect_smile(image_sequence[-1]):
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "nod" and detect_nod(image_sequence):
-                challenge_index += 1
-            elif selected_challenges[challenge_index] == "wink" and detect_wink(image_sequence[-1]):
-                challenge_index += 1
-            elif selected_challenges[challenge_index] in ["turn_left", "turn_right"]:
-                if is_live_feed(image_sequence):
-                    challenge_index += 1
-            
-            if challenge_index >= len(selected_challenges):
-                face_encoding = get_face_encoding(image)
-                user = db.query(User).filter_by(username = message['username']).one_or_none()
-                if user is None:
-                    break
-                # for user in users:
-                db_face_encoding = np.frombuffer(user.face_encoding, dtype=np.float64)
-                matches = face_recognition.compare_faces([db_face_encoding], face_encoding)
-                if True in matches:
-                    await websocket.send_json({"success": True, "msg": f"Login successful for {user.username}"})
-                    await websocket.close()
-                    return
-            if challenge_index < len(selected_challenges):
-                await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
-            image_sequence.pop(0)
-    
-    await websocket.send_json({"success": False, "msg": "Login failed"})
-    await websocket.close()
+    await process(websocket, db, "login")
 
 # TODO: full face detection and not partial
 # TODO: fix challenges
 # TODO: deepfake/fake detection
 # TODO: wink and blink differentiation
 # TODO: left wink and right wink separation
+# TODO: someone may use a script to send images based on the challenge so we need to detect that/detect liveness
+# TODO: can we detect depth of the face/image to detect if it's a real face or a photo?
+# TODO: break after 10 seconds if no response or after 60 images
