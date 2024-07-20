@@ -30,4 +30,4 @@ COPY . /app/
 EXPOSE 8080
 
 # Define the command to run the FastAPI app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload", "--env-file", ".env"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--reload"]
