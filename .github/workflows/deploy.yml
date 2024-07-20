@@ -37,9 +37,4 @@ jobs:
 
       - name: Deploy to Google Cloud Run
         run: |
-          gcloud run deploy facial-recognition-service \
-            --image europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection \
-            --platform managed \
-            --region europe-north1 \
-            --allow-unauthenticated \
-            --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
+          gcloud run deploy facial-recognition-service --image europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection --platform managed --region europe-north1 --allow-unauthenticated --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
