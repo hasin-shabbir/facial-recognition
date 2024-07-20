@@ -37,7 +37,7 @@ jobs:
 
       - name: Deploy to Google Cloud Run
         run: |
-          gcloud run deploy your-service-name \
+          gcloud run deploy facial-recognition-service \
             --image europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection \
             --platform managed \
             --region europe-north1 \
