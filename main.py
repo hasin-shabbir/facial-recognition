@@ -1,4 +1,4 @@
-from fastapi import FastAPI, WebSocket, Depends, HTTPException
+from fastapi import FastAPI, WebSocket, Depends
 from fastapi.staticfiles import StaticFiles
 from fastapi.requests import Request
 from fastapi.responses import FileResponse
