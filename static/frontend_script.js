@@ -15,7 +15,7 @@ function initializePageText(mode){
     }
 }
 function initializePage(mode, username){
-    const baseUrl = (window.location.origin !== undefined) && (window.location.origin !== null) && (window.location.origin !== "null") ? window.location.origin : 'localhost:8003';
+    const baseUrl = (window.location.origin !== undefined) && (window.location.origin !== null) && (window.location.origin !== "null") ? window.location.origin.replace('https//','https://') : 'localhost:8003';
     const socketUrl = mode === 'register' ? `wss://${baseUrl}/register` : `wss://${baseUrl}/login`;
     const socket = new WebSocket(socketUrl);
     const constraints = { video: true };
