@@ -23,23 +23,22 @@ jobs:
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      - name: Configure gcloud
+      - name: Configure gcloud for Artifact Registry
         run: |
-          gcloud config set project tensile-cogency-404310
-          gcloud config set run/region europe-north1
+          gcloud auth configure-docker europe-north1-docker.pkg.dev
 
       - name: Build Docker image
         run: |
-          docker build -t gcr.io/tensile-cogency-404310/facial-detection .
+          docker build -t europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection .
 
       - name: Push Docker image
         run: |
-          docker push gcr.io/tensile-cogency-404310/facial-detection
+          docker push europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection
 
       - name: Deploy to Google Cloud Run
         run: |
           gcloud run deploy your-service-name \
-            --image gcr.io/tensile-cogency-404310/facial-detection \
+            --image europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection \
             --platform managed \
             --region europe-north1 \
             --allow-unauthenticated \
