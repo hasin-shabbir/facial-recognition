@@ -21,7 +21,7 @@ MarkupSafe==2.1.5
 mdurl==0.1.2
 mysqlclient==2.2.4
 numpy==1.26.4
-opencv-python==4.10.0.84
+opencv-python-headless==4.10.0.84
 pillow==10.4.0
 pydantic==2.8.2
 pydantic_core==2.20.1
