@@ -271,7 +271,7 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
                    (challenge == "wink" and detect_wink(image_sequence[-1])) or \
                    (challenge == "turn_left" and detect_turn(image_sequence, "left")) or \
                    (challenge == "turn_right" and detect_turn(image_sequence, "right")):
-                        await websocket.send_json({"msg": f"{challenge} completed"})
+                        await websocket.send_json({"msg": f"{challenge} completed", "at": time.time() - start_time})
                         challenge_index += 1
                         challenge_communicated = False
 
