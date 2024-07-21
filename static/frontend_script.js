@@ -75,7 +75,7 @@ function initializePage(mode, username){
                 image: imageData,
             };
             socket.send(JSON.stringify(data));
-        }, 1000); // Send frames every 1000ms
+        }, 750); // Send frames every 750ms
     }
     
     // Cleanup media streams and WebSocket
