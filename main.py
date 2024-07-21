@@ -10,8 +10,6 @@ import random
 import numpy as np
 import cv2
 import face_recognition
-import face_recognition_models
-import dlib
 import time
 import os
 
@@ -33,8 +31,6 @@ engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base.metadata.create_all(bind=engine)
 
-detector = dlib.get_frontal_face_detector()
-predictor = dlib.shape_predictor(face_recognition_models.pose_predictor_model_location())
 smile_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_smile.xml')
 
 INITIAL_FRAMES = 4
@@ -52,19 +48,15 @@ def detect_blinks(image):
             if the eyes are closed for a certain number of frames and open before and after
     '''
     try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        rects = detector(gray, 0)
-        for rect in rects:
-            shape = predictor(gray, rect)
-            shape = face_recognition.face_landmarks(image)
-            left_eye = shape[0]["left_eye"]
-            right_eye = shape[0]["right_eye"]
-            
-            left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
-            right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
-            
-            if left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio < 0.2:
-                return True    
+        shape = face_recognition.face_landmarks(image)
+        left_eye = shape[0]["left_eye"]
+        right_eye = shape[0]["right_eye"]
+        
+        left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
+        right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
+        
+        if left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio < 0.2:
+            return True    
         return False
     except Exception as e:
         return False
@@ -173,18 +165,14 @@ def detect_turn(image_sequence, direction: str):
 
 def detect_wink(image):
     try:
-        gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-        rects = detector(gray, 0)
-        for rect in rects:
-            shape = predictor(gray, rect)
-            shape = face_recognition.face_landmarks(image)
-            left_eye = shape[0]["left_eye"]
-            right_eye = shape[0]["right_eye"]
-            
-            left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
-            right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
+        shape = face_recognition.face_landmarks(image)
+        left_eye = shape[0]["left_eye"]
+        right_eye = shape[0]["right_eye"]
+        
+        left_eye_aspect_ratio = calculate_eye_aspect_ratio(left_eye)
+        right_eye_aspect_ratio = calculate_eye_aspect_ratio(right_eye)
 
-            return (left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio > 0.2) or (left_eye_aspect_ratio > 0.2 and right_eye_aspect_ratio < 0.2)
+        return (left_eye_aspect_ratio < 0.2 and right_eye_aspect_ratio > 0.2) or (left_eye_aspect_ratio > 0.2 and right_eye_aspect_ratio < 0.2)
         return False
     except Exception as e:
         return False
