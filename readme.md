@@ -1,6 +1,6 @@
 # Facial Recognition User Validation
 
-Also employees liveness/spoof checks through randomized challenges, detection of micromovements, and full-face detection.
+Also employs liveness/spoof checks through randomized challenges, detection of micromovements, and full-face detection.
 
 ## DEMO
 (Sad reacts for weird smile/expressions, won't happen again 😤)
