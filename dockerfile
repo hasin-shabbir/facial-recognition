@@ -4,8 +4,9 @@ FROM python:3.12-slim
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+# ENV DATABASE_URL = mysql+mysqldb://user:password@host:port/dbname 
 
-# Install system dependencies for building mysqlclient
+# Install system dependencies
 RUN apt-get update \
     &&  apt-get install -y \
         build-essential \
