@@ -46,8 +46,8 @@ jobs:
       - name: Set up Global Load Balancer
         run: |
           # Create the backend services for each region
-          gcloud compute backend-services create facial-recognition-backend-asia-south2 --global --protocol HTTP
-          gcloud compute backend-services create facial-recognition-backend-me-central1 --global --protocol HTTP
+          gcloud compute backend-services create facial-recognition-backend-asia-south2 --global --protocol HTTPS
+          gcloud compute backend-services create facial-recognition-backend-me-central1 --global --protocol HTTPS
 
           # Add Cloud Run services to backend services using serverless NEG
           gcloud compute backend-services add-backend facial-recognition-backend-asia-south2 --global --network-endpoint-group=facial-recognition-service-asia-south2 --network-endpoint-group-region=asia-south2 --balancing-mode=RATE --max-rate=100
