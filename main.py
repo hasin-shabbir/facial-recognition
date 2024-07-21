@@ -199,7 +199,7 @@ def is_full_face_detected(face_landmarks_list):
 
 def calculate_landmark_shifts(image_sequence):
     sequence_length = INITIAL_FRAMES if len(image_sequence) >= INITIAL_FRAMES else len(image_sequence)
-    image_sequence = image_sequence[-INITIAL_FRAMES:]
+    image_sequence = image_sequence[-sequence_length:]
     landmarks_list = []
     for image in image_sequence:
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
