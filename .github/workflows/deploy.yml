@@ -25,16 +25,49 @@ jobs:
 
       - name: Configure gcloud for Artifact Registry
         run: |
-          gcloud auth configure-docker europe-north1-docker.pkg.dev
+          gcloud auth configure-docker asia-south2-docker.pkg.dev
+          gcloud auth configure-docker me-central1-docker.pkg.dev
+          gcloud auth configure-docker me-central2-docker.pkg.dev
 
       - name: Build Docker image
         run: |
-          docker build -t europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection .
+          docker build -t asia-south2-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection .
+          docker build -t me-central1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection .
+          docker build -t me-central2-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection .
 
       - name: Push Docker image
         run: |
-          docker push europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection
+          docker push asia-south2-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection
+          docker push me-central1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection
+          docker push me-central2-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection
 
       - name: Deploy to Google Cloud Run
         run: |
-          gcloud run deploy facial-recognition-service --image europe-north1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection --platform managed --region europe-north1 --allow-unauthenticated --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
+          gcloud run deploy facial-recognition-service-asia-south2 --image asia-south2-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection --platform managed --region asia-south2 --allow-unauthenticated --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
+          gcloud run deploy facial-recognition-service-me-central1 --image me-central1-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection --platform managed --region me-central1 --allow-unauthenticated --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
+          gcloud run deploy facial-recognition-service-me-central2 --image me-central2-docker.pkg.dev/tensile-cogency-404310/gcr/facial-detection --platform managed --region me-central2 --allow-unauthenticated --set-env-vars DATABASE_URL=${{ secrets.DATABASE_URL }}
+
+      - name: Set up Global Load Balancer
+        run: |
+          # Create the backend services for each region
+          gcloud compute backend-services create facial-recognition-backend-asia-south2 --global --protocol HTTP
+          gcloud compute backend-services create facial-recognition-backend-me-central1 --global --protocol HTTP
+          gcloud compute backend-services create facial-recognition-backend-me-central2 --global --protocol HTTP
+
+          # Add Cloud Run services to backend services using serverless NEG
+          gcloud compute backend-services add-backend facial-recognition-backend-asia-south2 --global --network-endpoint-group=facial-recognition-service-asia-south2 --network-endpoint-group-region=asia-south2 --balancing-mode=RATE --max-rate=100
+          gcloud compute backend-services add-backend facial-recognition-backend-me-central1 --global --network-endpoint-group=facial-recognition-service-me-central1 --network-endpoint-group-region=me-central1 --balancing-mode=RATE --max-rate=100
+          gcloud compute backend-services add-backend facial-recognition-backend-me-central2 --global --network-endpoint-group=facial-recognition-service-me-central2 --network-endpoint-group-region=me-central2 --balancing-mode=RATE --max-rate=100
+
+          # Create URL map
+          gcloud compute url-maps create facial-recognition-url-map --default-service=facial-recognition-backend-asia-south2
+
+          # Add path matchers
+          gcloud compute url-maps add-path-matcher facial-recognition-url-map --default-service=facial-recognition-backend-me-central1 --path-matcher-name=me-central1
+          gcloud compute url-maps add-path-matcher facial-recognition-url-map --default-service=facial-recognition-backend-me-central2 --path-matcher-name=me-central2
+
+          # Create HTTP proxy
+          gcloud compute target-http-proxies create http-lb-proxy --url-map=facial-recognition-url-map
+
+          # Create forwarding rule
+          gcloud compute forwarding-rules create http-content-rule --global --target-http-proxy=http-lb-proxy --ports=80

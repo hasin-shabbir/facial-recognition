@@ -320,7 +320,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 
 @app.get('/hc')
 def health_check():
-    return {"status": "ok"}
+    return 'OK'
 
 @app.get("/")
 async def root():
