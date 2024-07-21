@@ -360,3 +360,4 @@ async def login(websocket: WebSocket, db: Session = Depends(get_db)):
 # TODO: can we detect depth of the face/image to detect if it's a real face or a photo?
 # TODO: deepfake/fake detection
 # TODO: frame life check to assert consistency, lighting, texture, continuity etc. instead of single images anywhere
+# TODO: could use mediapipe, face_recognition, cv2 for more accurate face detection and landmarks without having to install dlib
