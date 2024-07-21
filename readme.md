@@ -2,7 +2,8 @@
 
 Also employees liveness/spoof checks through randomized challenges, detection of micromovements, and full-face detection.
 
-<img src="https://github.com/hasin-shabbir/facial-recognition/blob/main/facial_recognition.gif" width="400" height="200">
+https://github.com/user-attachments/assets/8b1f3e8e-cab0-4593-a208-f5cac8e3631f
+
 
 ## How to?
 - Register on /register
