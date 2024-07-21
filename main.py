@@ -231,12 +231,8 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
     selected_challenges = random.sample(challenges, 2)
     challenge_index = 0
     challenge_communicated = False
-    first_message_acknowledged = False
     try:
         async for message in websocket.iter_text():
-            if not first_message_acknowledged:
-                await websocket.send_json({"msg": "Received first message", "at": time.time() - start_time})
-                first_message_acknowledged = True
             if time.time() - start_time > 90:
                 await websocket.send_json({"success": False, "msg": "Time limit exceeded, try again"})
                 await websocket.close()
