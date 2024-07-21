@@ -29,7 +29,7 @@ https://github.com/user-attachments/assets/8b1f3e8e-cab0-4593-a208-f5cac8e3631f
 ## Run locally without Docker
 - Install cmake (for example `brew install cmake`)
 - `pip install --no-cache-dir -r requirements.txt`
-- create a .env file in the root directory and set DATABASE_URL = {your_db_url} (again, if you are a friend or from Noon, hit me up and I'll provide you with one already set up)
+- create a `.env` file in the root directory (see env.example) and set DATABASE_URL = {your_db_url} (again, if you are a friend or from Noon, hit me up and I'll provide you with one already set up)
 - `uvicorn main:app --reload --port 8003 --env-file .env`
 - Navigate to `http://localhost:8003`
 
