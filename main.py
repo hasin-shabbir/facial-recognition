@@ -149,7 +149,7 @@ def detect_turn(image_sequence, direction: str):
     if direction.lower() not in ["left", "right"]:
         return False
     try:
-        turn_threshold = 10
+        turn_threshold = 20
         previous_x = None
 
         for frame in image_sequence:
@@ -189,8 +189,10 @@ def detect_wink(image):
     except Exception as e:
         return False
     
-def is_full_face_detected(face_landmarks_list):
+def is_full_face_detected(face_landmarks_list, challenge):
     required_landmarks = ["chin", "left_eye", "right_eye", "nose_tip", "top_lip", "bottom_lip", "left_eyebrow", "right_eyebrow", "nose_bridge"]
+    if challenge in ("turn_left", "turn_right"):
+        required_landmarks = ["chin", "nose_tip", "top_lip", "bottom_lip", "nose_bridge"]
     for face_landmarks in face_landmarks_list:
         for landmark in required_landmarks:
             if landmark not in face_landmarks:
@@ -240,6 +242,7 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
     challenges = ["blink", "wink", "smile", "nod", "turn_left", "turn_right"]
     selected_challenges = random.sample(challenges, 2)
     challenge_index = 0
+    challenge_communicated = False
     try:
         async for message in websocket.iter_text():
             if time.time() - start_time > 30:
@@ -261,7 +264,7 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
             rgb_image = cv2.cvtColor(image_sequence[-1], cv2.COLOR_BGR2RGB)
             face_landmarks_list = face_recognition.face_landmarks(rgb_image)
 
-            if not face_landmarks_list or not is_full_face_detected(face_landmarks_list):
+            if not face_landmarks_list or not is_full_face_detected(face_landmarks_list, selected_challenges[challenge_index]):
                 await websocket.send_json({"success": False, "msg": "Full face not detected"})
                 await websocket.close()
                 return
@@ -282,6 +285,7 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
                    (challenge == "turn_right" and detect_turn(image_sequence, "right")):
                         await websocket.send_json({"msg": f"{challenge} completed"})
                         challenge_index += 1
+                        challenge_communicated = False
 
                 if challenge_index >= len(selected_challenges):
                     face_encoding = get_face_encoding(image)
@@ -311,12 +315,14 @@ async def process(websocket: WebSocket, db: Session, process_type: str):
                         await websocket.close()
                         return
 
-                if challenge_index < len(selected_challenges):
+                if challenge_index < len(selected_challenges) and not challenge_communicated:
                     await websocket.send_json({"current_challenge": selected_challenges[challenge_index]})
+                    challenge_communicated = True
 
         await websocket.send_json({"success": False, "msg": f"{"registration" if process_type == "register" else "login"} failed"})
         await websocket.close()
     except Exception as e:
+        await websocket.send_json({"success": False, "msg": f"Error: {str(e)}"})
         await websocket.send_json({"success": False, "msg": f"{"registration" if process_type == "register" else "login"} failed"})
         await websocket.close()
 
