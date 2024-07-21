@@ -9,8 +9,8 @@ https://github.com/user-attachments/assets/8b1f3e8e-cab0-4593-a208-f5cac8e3631f
 
 
 ## How to?
-- Register on /register
-- Login on /login using the same username
+- Register on `/register`
+- Login on `/login` using the same username
 - Use a wrong username+face combination and (hopefully) it won't work :')
 
 ## Todos (feel free to suggest smart/scalable solutions):
@@ -23,8 +23,8 @@ https://github.com/user-attachments/assets/8b1f3e8e-cab0-4593-a208-f5cac8e3631f
 ## To run locally using Docker
 - uncomment `ENV DATABASE_URL` in dockerfile and set it to your own url (if you are a friend or from Noon, hit me up and I'll provide you with one already set up)
 - `docker build -t facial-recognition .`
-- `docker run -d -p 8080:8080 facial-recognition`
-- Navigate to `http://localhost:8080`
+- `docker run facial-recognition`
+- Navigate to localhost on the indicated port
 
 ## Run locally without Docker
 - Install cmake (for example `brew install cmake`)
@@ -44,12 +44,12 @@ https://github.com/user-attachments/assets/8b1f3e8e-cab0-4593-a208-f5cac8e3631f
 
 ## FAQs
 ### Why does the build process take so long?
-Well, there's currently a dependency on dlib through face_recognition and building its wheels takes forever. We could do either:
-- Use pre-built wheels stored somewhere
+Well, there's currently a dependency on dlib through face_recognition and building its wheel takes forever. We could do either:
+- Use pre-built wheel stored somewhere
 - Wait for me to use some alternative lib/model. I just built an MVP to show that stuff works.
 
 ### Getting an error that says image type should be 8-bit or RGB etc.
 - Use numpy version <=2.0 (I'm using 1.26.4 and it works). v>=2.0 breaks stuff for some libs etc.
 
-### Cannot build wheels for dlib
-- Ensure you have cmake installed in your system. Generally, make sure you have everything installed mentioned under `# Install system dependencies` in dockerfile. I'll do dependency cleanup later and update.
+### Cannot build wheel for dlib
+- Ensure you have `cmake` installed in your system e.g. using `brew install cmake`. Generally, make sure you have everything mentioned under `# Install system dependencies` in dockerfile installed in your system/venv. I'll do dependency cleanup later and update.
