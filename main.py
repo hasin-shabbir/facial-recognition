@@ -94,6 +94,7 @@ def is_live_feed(image_sequence):
             return False
     return True
 
+# TODO: this (and others) are doing multi-face detection. ig we should return False if num_faces (len(face_locations))>1
 def detect_smile(image):
     try:
         rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
